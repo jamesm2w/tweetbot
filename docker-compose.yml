@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+ server:
+  build:
+   context: .
+  ports:
+   - 8888:8888
+   - 9229:9229
+  environment:
+   - CONNECTIONSTRING=mongodb://mongo:27017/
+  volumes:
+   - ./:/app
+  command: npm start
+
+ mongo:
+  image: mongo:5.0
+  ports:
+   - 27017:27017
+  volumes:
+   - mongodb:/data/db
+   - mongodb_config:/data/configdb
+volumes:
+ mongodb:
+ mongodb_config:

@@ -1,26 +1,25 @@
 require("dotenv").config();
-
+const { MongoClient } = require('mongodb');
 const http = require("http");
 const needle = require("needle");
-const token = process.env.BEARER_TOKEN;
 
-const webhook = "https://discord.com/api/webhooks/869954788157194342/VGTzrt0xi5uJ5Wduhet5UDBu1IWnB6ewvl4vOlCmiMDicj-BFmQUGNoJG0dv_75sFfJZ";
+const token = process.env.BEARER_TOKEN;
+const dbClient = new MongoClient(process.env.CONNECTIONSTRING);
+const dbName = "tweetbot";
+
+//no i wont const webhook = "webhook";
 
 const rulesURL = 'https://api.twitter.com/2/tweets/search/stream/rules';
 const streamURL = 'https://api.twitter.com/2/tweets/search/stream?expansions=author_id&user.fields=name,username,profile_image_url,id&tweet.fields=author_id,id';
 
-const rules = [{
-    "value": "from:BritainElects OR from:PoliticsForAlI",
-    "tag": "from interested accounts"
-}];
-
 let lastAlive = new Date();
 
 function log (msg) {
-    let date = (new Date()).toUTCString();
-    console.log(date + "] " + msg);
+    let date = (new Date()).toLocaleString("en-GB");
+    console.log("[" + date + "] " + msg);
 }
 
+// Fetch current rules from twitter
 async function getCurrentRules () {
     let response = await needle("GET", rulesURL, {}, {
         headers: {
@@ -36,6 +35,7 @@ async function getCurrentRules () {
     return response.body;
 }
 
+// Delete all the given rules from twitter stream
 async function deleteAllRules (ruleArr) {
     if (!Array.isArray(ruleArr)) {
         return null;
@@ -64,7 +64,8 @@ async function deleteAllRules (ruleArr) {
     return response.body;
 }
 
-async function setRules () {
+// Set the given rules on the twitter filter stream
+async function setRules (rules) {
     let data = {
         "add": rules
     };
@@ -84,6 +85,7 @@ async function setRules () {
     return response.body;
 }
 
+// Connect to twitter stream and start listening to data
 function twitterStreamConnect (retryAttempt) {
     const stream = needle.get(streamURL, {
         headers: {
@@ -103,7 +105,7 @@ function twitterStreamConnect (retryAttempt) {
             // Construct url from base + tweet ID
             let userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
             let url = "https://twitter.com/i/status/" + json.data.id;
-
+            
             // Provide some fallbacks just in-case data from twitter is not available.
             let hookLoad = {
                 "username": userData.name || "Twitter Bot",
@@ -111,15 +113,18 @@ function twitterStreamConnect (retryAttempt) {
                 "content": url || "Webhook Error"
             };
             
-            // Send discord webhook
-            let response = await needle("POST", webhook, hookLoad);
+            // If tweet matched any rules lets send it to those webhooks.
+            for (let rule of json.matching_rules) {
+                // Send discord webhook
+                let response = await needle("POST", rule.tag, hookLoad);
 
-            // Discord responds with 204 No Content when successful.
-            if (response.statusCode !== 204) {
-                log("[Discord Webhook] unexpected code: " + response.statusCode + " " + response.statusMessage);
-                throw new Error(response.body);
-            } else {
-                log("Recieved New Tweet: " + url);
+                // Discord responds with 204 No Content when successful.
+                if (response.statusCode !== 204) {
+                    log("[Discord Webhook] unexpected code: " + response.statusCode + " " + response.statusMessage);
+                    throw new Error(response.body);
+                } else {
+                    log("Recieved New Tweet: " + url);
+                }
             }
 
             // Successful connection => reset retry counter
@@ -158,18 +163,31 @@ function twitterStreamConnect (retryAttempt) {
 }
 
 (async () => {
-    let currentRules;
+    //let rules = [{
+    //    "value": "from:BritainElects OR from:PoliticsForAlI",
+    //    "tag": "webhook"
+    //}];
+
+    await dbClient.connect();
+
+    log("Connected to MongoDB");
+
+    const db = dbClient.db(dbName);
+    const collection = db.collection("rules");
+
+    let rules1 = (await collection.find({}).toArray()).map(r => { return {"value": r.value, "tag": r.tag} });
+    log("Loaded rules: " + JSON.stringify(rules1));
 
     // Set up the rules for the filtered stream
     try {
         // Gets the complete list of rules currently applied to the stream
-        currentRules = await getCurrentRules();
+        let currentRules = await getCurrentRules();
 
         // Delete all rules. Comment the line below if you want to keep your existing rules.
         await deleteAllRules(currentRules);
 
         // Add rules to the stream. Comment the line below if you don't want to add new rules.
-        await setRules();
+        await setRules(rules1);
 
     } catch (e) {
         console.error(e);

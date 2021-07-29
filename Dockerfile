@@ -1,10 +1,22 @@
-# specify the node base image with your desired version node:<version>
+# syntax=docker/dockerfile:1
+
+# latest node version
 FROM node:14
-# replace this with your application's default port
+
+# port to use
 EXPOSE 8888
 
-COPY . .
+# set /app as the working dir for the following commands
+WORKDIR /app
 
+# copy main config files
+COPY ["package.json", "package-lock.json*", "./"]
+
+# install modules
 RUN npm install
 
+# copy files into image
+COPY . .
+
+# start the app
 CMD ["npm", "start"]
