@@ -1,17 +1,25 @@
 require("dotenv").config();
 
+const http = require("http");
 const needle = require("needle");
 const token = process.env.BEARER_TOKEN;
 
 const webhook = "https://discord.com/api/webhooks/869954788157194342/VGTzrt0xi5uJ5Wduhet5UDBu1IWnB6ewvl4vOlCmiMDicj-BFmQUGNoJG0dv_75sFfJZ";
 
 const rulesURL = 'https://api.twitter.com/2/tweets/search/stream/rules';
-const streamURL = 'https://api.twitter.com/2/tweets/search/stream?expansions=author_id&user.fields=name,username,profile_image_url';
+const streamURL = 'https://api.twitter.com/2/tweets/search/stream?expansions=author_id&user.fields=name,username,profile_image_url,id&tweet.fields=author_id,id';
 
 const rules = [{
     "value": "from:BritainElects OR from:PoliticsForAlI",
     "tag": "from interested accounts"
 }];
+
+let lastAlive = new Date();
+
+function log (msg) {
+    let date = (new Date()).toUTCString();
+    console.log(date + "] " + msg);
+}
 
 async function getCurrentRules () {
     let response = await needle("GET", rulesURL, {}, {
@@ -21,7 +29,7 @@ async function getCurrentRules () {
     });
 
     if (response.statusCode !== 200) {
-        console.log("Error: ", response.statusMessage, response.statusCode);
+        log("[Get current rules] Err: " + response.statusCode + " " + response.statusMessage);
         throw new Error(response.body);
     }
 
@@ -49,6 +57,7 @@ async function deleteAllRules (ruleArr) {
     });
 
     if (response.statusCode !== 200) {
+        log("[Delete rules] Err: " + response.statusCode + " " + response.statusMessage);
         throw new Error(response.body);
     }
 
@@ -60,7 +69,7 @@ async function setRules () {
         "add": rules
     };
 
-    let response = await needle('post', rulesURL, data, {
+    let response = await needle('POST', rulesURL, data, {
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
@@ -68,13 +77,14 @@ async function setRules () {
     })
 
     if (response.statusCode !== 201) {
+        log("[Set rules] Err: " + response.statusCode + " " + response.statusMessage);
         throw new Error(response.body);
     }
 
     return response.body;
 }
 
-function twitterStreamConnect (retryAttempt, onSuccess) {
+function twitterStreamConnect (retryAttempt) {
     const stream = needle.get(streamURL, {
         headers: {
             "User-Agent": "v2FilterStreamTEST",
@@ -83,35 +93,62 @@ function twitterStreamConnect (retryAttempt, onSuccess) {
         timeout: 20000
     });
     
-    stream.on("data", data => {
+    stream.on("data", async data => {
         try {
             const json = JSON.parse(data);
 
-            // send a discord webhook or something?
-            onSuccess(json);
+            console.log(json);
+
+            // Construct webhook payload data. Find the user which tweeted in the `include` section
+            // Construct url from base + tweet ID
+            let userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
+            let url = "https://twitter.com/i/status/" + json.data.id;
+
+            // Provide some fallbacks just in-case data from twitter is not available.
+            let hookLoad = {
+                "username": userData.name || "Twitter Bot",
+                "avatar_url": userData.profile_image_url || "", 
+                "content": url || "Webhook Error"
+            };
+            
+            // Send discord webhook
+            let response = await needle("POST", webhook, hookLoad);
+
+            // Discord responds with 204 No Content when successful.
+            if (response.statusCode !== 204) {
+                log("[Discord Webhook] unexpected code: " + response.statusCode + " " + response.statusMessage);
+                throw new Error(response.body);
+            } else {
+                log("Recieved New Tweet: " + url);
+            }
+
             // Successful connection => reset retry counter
             retryAttempt = 0;
         } catch (e) {
             if (data.detail === "This stream is currently at the maximum allowed connection limit.") {
+                // Twitter stream limit - maybe previous connection has not wrapped up?
                 // Kill signal
-                console.log(data.detail);
+                log("[Stream] Twitter Connection Refused");
+                log(data.detail);
                 process.exit(1);
             } else {
                 // Keep alive signal
+                log("[Stream] Keep Alive from Twitter");
+                lastAlive = new Date();
             }
         }
     }).on('err', error => {
-        console.log("Error connecting to twitter stream");
+        log("[Stream] Error connecting to twitter stream");
         if (error.code !== 'ECONNRESET') {
             // Some other connection error
-            console.log(error.code);
+            log(error.code);
             process.exit(1);
         } else {
             // This reconnection logic will attempt to reconnect when a disconnection is detected.
             // To avoid rate limits, this logic implements exponential backoff, so the wait time
             // will increase if the client cannot reconnect to the stream. 
             setTimeout(() => {
-                console.warn("A connection error occurred. Reconnecting...")
+                console.warn("[Stream] A connection error occurred. Reconnecting...")
                 streamConnect(++retryAttempt);
             }, 2 ** retryAttempt)
         }
@@ -123,8 +160,8 @@ function twitterStreamConnect (retryAttempt, onSuccess) {
 (async () => {
     let currentRules;
 
+    // Set up the rules for the filtered stream
     try {
-
         // Gets the complete list of rules currently applied to the stream
         currentRules = await getCurrentRules();
 
@@ -135,32 +172,17 @@ function twitterStreamConnect (retryAttempt, onSuccess) {
         await setRules();
 
     } catch (e) {
-        console.log(JSON.stringify(e));
         console.error(e);
         process.exit(1);
     }
-    console.log("Establishing connection with Twitter Feed");
+
+    log("Establishing connection with Twitter Feed");
+
     // Listen to the stream.
-    twitterStreamConnect(0, (json) => {
-        if (json.data?.id != undefined) {
+    twitterStreamConnect(0);
 
-            let hookLoad = {
-                "username": json.includes?.name || "Twitter Bot",
-                "avatar_url": json.includes?.profile_image_url || "", 
-                "content": url
-            };
-
-            let url = "https://twitter.com/i/status/" + json.data.id;
-            needle.post(webhook, hookLoad, (err, res) => {
-                if (err) {
-                    throw new Error(err);
-                }
-
-                // WE're all good.
-                console.log("Recieved new Tweet :", url);
-            });
-        } else {
-            console.log(json);
-        }
-    });
+    http.createServer((req, res) => {
+        res.writeHead(200);
+        res.end("TweetBot Active and Listening. Last Alive: " + lastAlive.toUTCString());
+    }).listen(8888);
 })();
