@@ -9,6 +9,8 @@ services:
    - 9229:9229
   environment:
    - CONNECTIONSTRING=mongodb://mongo:27017/
+   - PORT=8888
+   - DEBUGPORT=9229
   volumes:
    - ./:/app
   command: npm start
