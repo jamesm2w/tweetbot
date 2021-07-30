@@ -115,9 +115,8 @@ async function run () {
         let channels = await channelCollection.find({}).toArray();
         let rules = createRuleSet(channels);
 
-        console.log(rules);
-
         let twitterManager = new TwitterFilterStream(sendWebhookData, rules);
+        log("Filter rules:" + JSON.stringify(twitterManager.filterRules));
         twitterManager.connect();
 
         // TODO: add express to manage easy add/remove of rules.
@@ -155,12 +154,12 @@ async function run () {
         });
 
         app.listen(process.env.PORT);
-    } finally {
-        dbClient.close();
+    } catch (err) {
+        log(err);
+        throw new Error(err);
     }
 }
 
 run().catch(err => {
     console.log(err);
-    throw new Error(err);
 });

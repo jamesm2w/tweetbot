@@ -6,8 +6,7 @@ const token = process.env.BEARER_TOKEN;
 
 class TwitterFilterStream {
 
-    _constructor (onDataFunction, filterRules) {
-        console.log(filterRules);
+    constructor (onDataFunction, filterRules) {
         this.onDataFunction = onDataFunction;
         this.filterRules = filterRules;
         this.lastAlive = undefined;
@@ -34,7 +33,7 @@ class TwitterFilterStream {
             await this.setRules(this.filterRules);
 
             // Check if rules have been applied correctly
-            this.log("[RuleLoader] Final Stream Rules: " + JSON.stringify(await getCurrentRules()));
+            this.log("[RuleLoader] Final Stream Rules: " + JSON.stringify(await this.getCurrentRules()));
         } catch (err) {
             // Promise Errors get thrown up here and it exits with non-0 code.
             console.error(err);
@@ -130,19 +129,19 @@ class TwitterFilterStream {
     }
 
     async deleteRules (ruleArr) {
-        if (!Array.isArray(ruleArr)) {
+
+        if (!Array.isArray(ruleArr.data)) {
             return null;
         }
-        console.log(ruleArr);
+
         let ids = ruleArr.data.map(rule => rule.id);
-        console.log(ids);
+
         let data = {
             "delete": {
                 "ids": ids
             }
         };
-    
-
+        
         let response = await needle("POST", rulesURL, data, {
             headers: {
                 "Content-Type": "application/json",
