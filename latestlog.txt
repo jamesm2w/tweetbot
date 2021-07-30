@@ -1,0 +1,8 @@
+[30/07/2021, 19:26:25][Index] Connected to MongoDB
+[30/07/2021, 19:26:25][Index] Filter rules:[{"value":"from:PoliticsForAlI OR from:BritainElects","tag":"Rule 1"}]
+[30/07/2021, 19:26:25][TwitterFilterStream] Attempting to connect to twitter stream.
+[30/07/2021, 19:26:25][TwitterFilterStream] [RuleLoader] Loaded rules: [{"value":"from:PoliticsForAlI OR from:BritainElects","tag":"Rule 1"}]
+[30/07/2021, 19:26:25][TwitterFilterStream] [RuleLoader] Current Stream Rules: {"data":[{"id":"1421134990734209032","value":"from:PoliticsForAlI OR from:BritainElects","tag":"Rule 1"}],"meta":{"sent":"2021-07-30T18:26:25.812Z"}}
+[30/07/2021, 19:26:27][TwitterFilterStream] [RuleLoader] Cleared Rules
+[30/07/2021, 19:26:28][TwitterFilterStream] [RuleLoader] Final Stream Rules: {"data":[{"id":"1421175370615857154","value":"from:PoliticsForAlI OR from:BritainElects","tag":"Rule 1"}],"meta":{"sent":"2021-07-30T18:26:28.763Z"}}
+[30/07/2021, 19:26:49][TwitterFilterStream] Connected State Changed to true

@@ -68,7 +68,6 @@ class TwitterFilterStream {
         stream.on("data", async data => {
             try {
                 const json = JSON.parse(data);
-                console.log(json);
                 this.onDataFunction(json);
                 
                 // Successful connection => reset retry counter
