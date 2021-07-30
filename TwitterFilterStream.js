@@ -85,7 +85,7 @@ class TwitterFilterStream {
                     }, 2 ** retryAttempt);
                 } else {
                     // Keep alive signal
-                    this.log("[Stream] Keep Alive from Twitter");
+                    //this.log("[Stream] Keep Alive from Twitter");
                     this.lastAlive = new Date();
 
                     if (!this.connected) {
