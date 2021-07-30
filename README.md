@@ -6,6 +6,6 @@ Requires a .env file with the following twitter application keys:
 API_KEY=
 API_SECRET=
 BEARER_TOKEN=
+CONNECTIONSTRING=
+PORT=
 ```
-
-Requires `dotenv` and `needle`
