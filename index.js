@@ -21,7 +21,19 @@ function log (msg) {
 async function sendWebhookData (json) {
     // Construct webhook payload data. Find the user which tweeted in the `include` section
     // Construct url from base + tweet ID
-    let userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
+    let userData = {
+        username: "i",
+        name: "TweetBot",
+        profile_image_url: "https://image.flaticon.com/icons/png/512/124/124021.png"
+    };
+
+    if (json.includes == undefined || !Array.isArray(json.includes.users)) {
+        this.log("Missing user data on tweet");
+        console.log(json);
+    } else {
+        userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
+    }
+    
     let url = `https://twitter.com/${userData.username}/status/${json.data.id}`;
     
     // Provide some fallbacks just in-case data from twitter is not available.
@@ -128,7 +140,7 @@ async function run () {
                 statusStr = "TweetBot Disconnected"
             }
 
-            statusStr += " Last Alive: " + twitterManager.lastAlive.toISOString();
+            statusStr += " Last Alive: " + twitterManager.lastAlive.toLocaleString("en-GB");
             res.send(statusStr);
         });
 

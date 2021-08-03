@@ -68,8 +68,13 @@ class TwitterFilterStream {
         stream.on("data", async data => {
             try {
                 const json = JSON.parse(data);
-                this.onDataFunction(json);
-                
+
+                try {
+                    this.onDataFunction(json);
+                } catch(err) {
+                    this.log("[Stream] Error in executing onDataFunction");
+                    console.error(err);
+                }
                 // Successful connection => reset retry counter
                 retryAttempt = 0;
             } catch (e) {

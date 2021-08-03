@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node index.js",
     "start": "node index.js",
-    "silent": "node index.js > latestlog.txt 2>&1"
+    "silent": "node index.js > latestlog.txt 2>latesterr.txt"
   },
   "author": "jamesm2w",
   "license": "MIT",
