@@ -1,3 +1,4 @@
+const { json } = require("express");
 const needle = require("needle");
 
 const rulesURL = 'https://api.twitter.com/2/tweets/search/stream/rules';
@@ -69,16 +70,30 @@ class TwitterFilterStream {
             try {
                 const json = JSON.parse(data);
 
-                try {
-                    this.onDataFunction(json);
-                } catch(err) {
-                    this.log("[Stream] Error in executing onDataFunction");
-                    console.error(err);
+                if (Array.isArray(json.errors)) {
+                    // Some sort of error?
+                    throw new Error(json);
                 }
+
+                this.onDataFunction(json);
+
                 // Successful connection => reset retry counter
                 retryAttempt = 0;
             } catch (e) {
-                if (data.detail === "This stream is currently at the maximum allowed connection limit.") {
+                if (Array.isArray(e.errors)) {
+                    // Some error from Twitter
+                    for (let err of e.errors) {
+                        this.log("[Stream][Err] " + JSON.stringify(err));
+                        console.err(err);    
+                    }
+                    //this.setConnected(false);
+
+                    // setTimeout(() => {
+                    //    console.warn("[Stream] An error occurred. Reconnecting...")
+                    //    twitterStreamConnect(++retryAttempt);
+                    // }, 2 ** retryAttempt);
+
+                } else if (data.detail === "This stream is currently at the maximum allowed connection limit.") {
                     // Twitter stream limit - maybe previous connection has not wrapped up?
                     // Kill signal
                     this.log("[Stream] Twitter Connection Refused");
