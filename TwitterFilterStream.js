@@ -5,6 +5,12 @@ const rulesURL = 'https://api.twitter.com/2/tweets/search/stream/rules';
 const streamURL = 'https://api.twitter.com/2/tweets/search/stream?expansions=author_id&user.fields=name,username,profile_image_url,id&tweet.fields=author_id,id';
 const token = process.env.BEARER_TOKEN;
 
+const headers = {
+    "User-Agent": "tweetbot/jamesm2w",
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json"
+}
+
 class TwitterFilterStream {
 
     constructor (onDataFunction, filterRules) {
@@ -19,124 +25,126 @@ class TwitterFilterStream {
     async connect () {
         this.log("Attempting to connect to twitter stream.")
         try {
-
             this.log("[RuleLoader] Loaded rules: " + JSON.stringify(this.filterRules));
 
             // Gets the complete list of rules currently applied to the stream
             let currentRules = await this.getCurrentRules();
             this.log("[RuleLoader] Current Stream Rules: " + JSON.stringify(currentRules));
 
-            // Delete all rules. Comment the line below if you want to keep your existing rules.
+            // Delete all rules from the filter.
             await this.deleteRules(currentRules);
             this.log("[RuleLoader] Cleared Rules");
 
-            // Add rules to the stream. Comment the line below if you don't want to add new rules.
+            // Add new rules to the filter.
             await this.setRules(this.filterRules);
 
             // Check if rules have been applied correctly
-            this.log("[RuleLoader] Final Stream Rules: " + JSON.stringify(await this.getCurrentRules()));
+            currentRules = await this.getCurrentRules();
+            this.log("[RuleLoader] Final Stream Rules: " + JSON.stringify(currentRules));
         } catch (err) {
-            // Promise Errors get thrown up here and it exits with non-0 code.
+            // Promise Errors get thrown up here and we exit with error code.
+            this.log("[RuleLoader] Error in setting up filter rules");
+            console.log(JSON.stringify(err));            
             console.error(err);
-            console.log(JSON.stringify(err));
+
             process.exit(1);
         }
 
-        this.stream = this.twitterStreamConnect(0);
-    }
+        this.stream = this.streamConnect(0);
 
-    setConnected (state) {
-        this.log("Connected State Changed to " + state);
-        this.connected = state;
-    }
-
-    destroyStream () {
-        if (this.connected && this.stream != undefined) {
-            this.stream.destroy();
-            this.setConnected(false);
-        }
-    }
-
-    twitterStreamConnect (retryAttempt) {
-        const stream = needle.get(streamURL, {
-            headers: {
-                "User-Agent": "tweetbotFilterStream",
-                "Authorization": `Bearer ${token}`
-            },
-            timeout: 20000
-        });
-        
-        stream.on("data", async data => {
-            try {
-                const json = JSON.parse(data);
-
-                if (Array.isArray(json.errors)) {
-                    // Some sort of error?
-                    throw new Error(json);
-                }
-
-                this.onDataFunction(json);
-
-                // Successful connection => reset retry counter
-                retryAttempt = 0;
-            } catch (e) {
-                if (Array.isArray(e.errors)) {
-                    // Some error from Twitter
-                    for (let err of e.errors) {
-                        this.log("[Stream][Err] " + JSON.stringify(err));
-                        console.err(err);    
-                    }
-                    //this.setConnected(false);
-
-                    // setTimeout(() => {
-                    //    console.warn("[Stream] An error occurred. Reconnecting...")
-                    //    twitterStreamConnect(++retryAttempt);
-                    // }, 2 ** retryAttempt);
-
-                } else if (data.detail === "This stream is currently at the maximum allowed connection limit.") {
-                    // Twitter stream limit - maybe previous connection has not wrapped up?
-                    // Kill signal
-                    this.log("[Stream] Twitter Connection Refused");
-                    this.log(data.detail);
-                    setTimeout(() => {
-                        console.warn("[Stream] A connection error occurred. Reconnecting...")
-                        twitterStreamConnect(++retryAttempt);
-                    }, 2 ** retryAttempt);
-                } else {
-                    // Keep alive signal
-                    //this.log("[Stream] Keep Alive from Twitter");
-                    this.lastAlive = new Date();
-
-                    if (!this.connected) {
-                        this.setConnected(true);
-                    }
-                }
-            }
-        }).on('err', error => {
-            this.log("[Stream] Error connecting to twitter stream");
-            if (error.code !== 'ECONNRESET') {
-                // Some other connection error
-                this.log(error.code);
+        setInterval(() => {
+            let diff = (new Date()) - this.lastAlive;
+            if (Math.floor(diff / 1000) > 5 * 60) {
+                this.log("No Keep Alive for 5 minutes. Assuming we're disconnected silently. Quitting.");
                 process.exit(1);
-            } else {
-                // This reconnection logic will attempt to reconnect when a disconnection is detected.
-                // To avoid rate limits, this logic implements exponential backoff, so the wait time
-                // will increase if the client cannot reconnect to the stream. 
-                setTimeout(() => {
-                    console.warn("[Stream] A connection error occurred. Reconnecting...")
-                    twitterStreamConnect(++retryAttempt);
-                }, 2 ** retryAttempt);
             }
+        }, 5 * 60 * 1000)
+    }
+
+    setConnected (bool) {
+        if (bool != this.connected) {
+            this.log("Connected set to " + bool);
+        }
+        this.connected = bool;
+    }
+
+    // Connect to the twitter filtered stream. Attempt count - incrementing counter if conn refused
+    streamConnect (attemptCount) {
+        this.log("Connecting: Attempt Count " + attemptCount);
+        // We need to stop trying at some point
+        if (attemptCount > 4) {
+            console.error("Too many attempts. Quitting.");
+            
+            process.exit(1);
+        }
+
+        // Initiate the stream
+        const stream = needle.get(streamURL, {
+            headers: headers,
+            timeout: 20000,
+            json: true,
+            parse_response: true,
+            output: "./latestnet.txt"
         });
-    
+
+        // Callback on certain events - rawData = stuff recv from twitter.
+        stream.on("data", rawData => {
+            //console.log("raw data", rawData);
+
+            if (rawData.title !== undefined) {
+                this.log("Connection Issue - " + rawData.title + ": " + rawData.detail);
+                return;
+            }
+
+            if (Array.isArray(rawData.errors)) {
+                for (let err of data.errors) {
+                    this.log("Stream Error - " + err.title + ": " + err.detail);
+                }
+                return;
+            }
+
+            if (rawData == "\r\n") {
+                this.lastAlive = new Date();
+            } else {
+                const data = JSON.parse(rawData);
+
+                //console.log("parsed data", data);
+
+                setTimeout(() => {
+                    this.onDataFunction.call({}, data);
+                }, 0);
+                
+            }
+
+            this.setConnected(true);
+            attemptCount = 0;        
+        });
+
+        stream.on("err", err => {
+            this.log("error event", err);
+            console.error(err);
+        });
+
+        // done - stream finished with possible error
+        stream.on("done", error => {
+            if (error) {
+                this.log("Stream Done with error", error);
+                console.error(error);
+            }
+            this.log("Stream Done and closed.");
+            this.setConnected(false);
+            setTimeout(() => {
+                this.log("Reconnecting...");
+                this.streamConnect(attemptCount++);
+            }, 100 * (5 ** (attemptCount++)));
+        });
+
         return stream;
     }
 
     async getCurrentRules () {
         let response = await needle("GET", rulesURL, {}, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
+            headers: headers
         });
     
         if (response.statusCode !== 200) {
@@ -162,10 +170,7 @@ class TwitterFilterStream {
         };
         
         let response = await needle("POST", rulesURL, data, {
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            }
+            headers: headers
         });
     
         if (response.statusCode !== 200) {
@@ -182,10 +187,7 @@ class TwitterFilterStream {
         };
     
         let response = await needle('POST', rulesURL, data, {
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            }
+            headers: headers
         })
     
         if (response.statusCode !== 201) {

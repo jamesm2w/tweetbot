@@ -28,7 +28,7 @@ async function sendWebhookData (json) {
     };
 
     if (json.includes == undefined || !Array.isArray(json.includes.users)) {
-        this.log("Missing user data on tweet");
+        log("Missing user data on tweet");
         console.log(json);
     } else {
         userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
@@ -140,7 +140,9 @@ async function run () {
                 statusStr = "TweetBot Disconnected"
             }
 
-            statusStr += " Last Alive: " + twitterManager.lastAlive.toLocaleString("en-GB");
+            statusStr += "\n";
+            statusStr += "Last Alive: " + twitterManager.lastAlive.toLocaleString("en-GB");
+            statusStr += "\n";
             res.send(statusStr);
         });
 
