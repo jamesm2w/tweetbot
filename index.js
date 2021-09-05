@@ -33,7 +33,7 @@ async function sendWebhookData (json) {
     } else {
         userData = json.includes.users.find(usr => usr.id == json.data.author_id) || {};
     }
-    
+
     let url = `https://twitter.com/${userData.username}/status/${json.data.id}`;
     
     // Provide some fallbacks just in-case data from twitter is not available.

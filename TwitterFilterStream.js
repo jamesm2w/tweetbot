@@ -96,18 +96,24 @@ class TwitterFilterStream {
                 return;
             }
 
-            if (Array.isArray(rawData.errors)) {
-                for (let err of data.errors) {
-                    this.log("Stream Error - " + err.title + ": " + err.detail);
-                }
-                return;
-            }
+            //if (Array.isArray(rawData.errors)) {
+            //    for (let err of data.errors) {
+            //        this.log("Stream Error - " + err.title + ": " + err.detail);
+            //    }
+            //    return;
+            //}
 
             if (rawData == "\r\n") {
                 this.lastAlive = new Date();
             } else {
                 const data = JSON.parse(rawData);
 
+                if (Array.isArray(data.errors)) {
+                    for (let err of data.errors) {
+                        this.log("Stream Error - " + err.title + ": " + err.detail);
+                    }
+                    return;
+                }
                 //console.log("parsed data", data);
 
                 setTimeout(() => {
