@@ -6,10 +6,10 @@
   "scripts": {
     "test": "node index.js",
     "start": "node index.js",
-    "silent": "node index.js > latestlog.txt 2>latesterr.txt"
+    "silent": "node index.js > latestlog 2>latesterr &"
   },
   "author": "jamesm2w",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "dotenv": "^10.0.0",
     "express": "^4.17.1",
