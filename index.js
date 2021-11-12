@@ -35,6 +35,12 @@ async function sendWebhookData (json) {
     }
 
     let url = `https://twitter.com/${userData.username}/status/${json.data.id}`;
+
+    if (userData.username.toLowerCase() == "PoliticsForAlI".toLowerCase() && (
+        json.data.text.toLowerCase().includes("crypto") || json.data.text.toLowerCase().includes("gambling") )) {
+            console.log("Crypto/Gambling tweet");
+            url = "Uh oh. Looks like PfA tried to post about crypto or gambling again. Please do better Mr PfA. \n ||" + url + "||";
+    }
     
     // Provide some fallbacks just in-case data from twitter is not available.
     let hookLoad = {
