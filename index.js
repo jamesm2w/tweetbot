@@ -97,16 +97,16 @@ function createRuleSet (channels) {
         // Rules can be up to 512 in length. If adding this account would be 
         // over, add the current rule and start on the next one.
         if (ruleStr.length + ruleStrAddition.length > 512) {
-            // Add to next rule, removing the prepended " OR "
-            rules.push({"value": ruleStr.substring(4), "tag": `Rule ${rules.length+1}`});
-            ruleStr = ruleStrAddition;
+            // Add to next rule, removing the prepended " OR " if it's not the first rule.
+            rules.push({"value": ruleStr, "tag": `Rule ${rules.length+1}`});
+            ruleStr = ruleStrAddition.substring(4);
         } else {
             // Concat rules together
             ruleStr += ruleStrAddition;
         }
     }
 
-    // Add remainder of the accounts to the final rule
+    // Add remainder of the accounts to the final rule. Need to remove the prepended "OR" from the first rule.
     if (ruleStr.length != 0) {
         rules.push({"value": ruleStr, "tag": `Rule ${rules.length+1}`});
     }

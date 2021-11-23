@@ -196,7 +196,7 @@ class TwitterFilterStream {
             headers: headers
         })
     
-        if (response.statusCode !== 201 && response.statusCode !== 200) {
+        if (response.statusCode !== 201) {
             this.log("[Set Rules] Err: " + response.statusCode + " " + response.statusMessage);
             throw new Error(JSON.stringify(response.body));
         }
