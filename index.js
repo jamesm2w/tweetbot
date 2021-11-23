@@ -97,8 +97,8 @@ function createRuleSet (channels) {
         // Rules can be up to 512 in length. If adding this account would be 
         // over, add the current rule and start on the next one.
         if (ruleStr.length + ruleStrAddition.length > 512) {
-            // Add to next rule
-            rules.push({"value": ruleStr, "tag": `Rule ${rules.length+1}`});
+            // Add to next rule, removing the prepended " OR "
+            rules.push({"value": ruleStr.substring(4), "tag": `Rule ${rules.length+1}`});
             ruleStr = ruleStrAddition;
         } else {
             // Concat rules together
