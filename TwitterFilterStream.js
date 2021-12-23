@@ -89,14 +89,14 @@ class TwitterFilterStream {
 
         // Callback on certain events - rawData = stuff recv from twitter.
         stream.on("data", rawData => {
-            //console.log("raw data", rawData);
+            //DEBUG: console.log("raw data", rawData);
 
             if (rawData.title !== undefined) {
                 this.log("Connection Issue - " + rawData.title + ": " + rawData.detail);
                 return;
             }
 
-            //if (Array.isArray(rawData.errors)) {
+            //DEBUG: if (Array.isArray(rawData.errors)) {
             //    for (let err of data.errors) {
             //        this.log("Stream Error - " + err.title + ": " + err.detail);
             //    }
@@ -106,19 +106,28 @@ class TwitterFilterStream {
             if (rawData == "\r\n") {
                 this.lastAlive = new Date();
             } else {
-                const data = JSON.parse(rawData);
 
-                if (Array.isArray(data.errors)) {
-                    for (let err of data.errors) {
-                        this.log("Stream Error - " + err.title + ": " + err.detail);
+                try {
+                    const data = JSON.parse(rawData);
+
+                    if (Array.isArray(data.errors)) {
+                        for (let err of data.errors) {
+                            this.log("Stream Error - " + err.title + ": " + err.detail);
+                        }
+                        return;
                     }
-                    return;
-                }
-                //console.log("parsed data", data);
+                    //DEBUG: console.log("parsed data", data);
 
-                setTimeout(() => {
-                    this.onDataFunction.call({}, data);
-                }, 0);
+                    setTimeout(() => { // Run data analysis in a separate thread to this main listening one.
+                        this.onDataFunction.call({}, data);
+                    }, 0);
+                
+                } catch (e) {
+                    
+                    this.log("Recorded Error - " + e);
+                
+                }
+                
                 
             }
 
@@ -137,8 +146,10 @@ class TwitterFilterStream {
                 this.log("Stream Done with error", error);
                 console.error(error);
             }
+            
             this.log("Stream Done and closed.");
             this.setConnected(false);
+
             setTimeout(() => {
                 this.log("Reconnecting...");
                 this.streamConnect(attemptCount++);
